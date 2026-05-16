@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific: UNHCR data must not be redistributed
+*.xlsx
+*.xls
+*.csv
+data/
+/mnt/
+   
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
