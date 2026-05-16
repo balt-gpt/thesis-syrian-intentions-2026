@@ -39,10 +39,5 @@ The script performs preprocessing, hyperparameter tuning by five-fold cross-vali
 
 Bayram Altıntaş — Master's student in Data Science and Society, Tilburg University.
 
-## License
 
-The code in this repository is released under the MIT License (see `LICENSE`). The UNHCR dataset is not redistributed and remains the property of UNHCR.
 
-## Acknowledgements
-
-This research was supported by the Jean Monnet Scholarship Programme, funded by the European Union.
