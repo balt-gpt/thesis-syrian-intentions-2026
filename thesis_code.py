@@ -1,6 +1,6 @@
 """
 Predicting Return Home Intentions of Syrian Refugees in Europe
-After the Fall of Assad's Regime Using Machine Learning
+After the Fall of Assad's Regime by Using Machine Learning
 
 Student     : Bayram Altintaş (u172831)
 Supervisor  : Dr. Çiçek Güven
@@ -128,8 +128,6 @@ y = le.transform(df["y"].values)
 
 # =============================================================================
 # SECTION 5 — PREPROCESSING PIPELINE
-# I use scikit-learn's Pipeline and ColumnTransformer to apply different
-# preprocessing steps to categorical and numeric columns separately.
 # =============================================================================
 cat_pipe = Pipeline([
     ("imputer", SimpleImputer(strategy="most_frequent")),
@@ -375,7 +373,7 @@ print(f"\n✓ Best model: {best_name}  "
 
 
 # =============================================================================
-# SECTION 13 — COUNTRY SUBGROUP ANALYSIS (Research Question 1.3)
+# SECTION 13 — COUNTRY SUBGROUP ANALYSIS 
 # =============================================================================
 print("\n" + "="*55)
 print("COUNTRY SUBGROUP ANALYSIS (best model on test set)")
@@ -427,7 +425,6 @@ perm_res = permutation_importance(
 )
 
 # Collapse importance scores back from OHE dummies to original variable level
-# (e.g. all gender_Male, gender_Female, gender_Unknown → "gender")
 ohe       = best_pipe.named_steps["prep"].named_transformers_["cat"].named_steps["ohe"]
 ohe_names = ohe.get_feature_names_out(CAT_FEATURES).tolist()
 feat_names = ohe_names + NUM_FEATURES
@@ -467,7 +464,80 @@ vi_df.index = [readable.get(i, i) for i in vi_df.index]
 
 
 # =============================================================================
-# SECTION 15 — FIGURES
+# SECTION 15 — SUBGROUP FAIRNESS TABLE (Table 3)
+# =============================================================================
+
+y_test_pred = best_gb.predict(X_test)
+
+sub = df.loc[X_test.index, [
+    "current_country", "temp_visit", "main_activity",
+    "legal_status", "age", "needs_care", "gender",
+    "arrival_year_num",
+]].copy()
+sub["y_true"] = y_test
+sub["y_pred"] = y_test_pred
+
+def cohort(year):
+    if year <= 2015: return "2011-2015"
+    if year <= 2020: return "2016-2020"
+    return "2021-2025"
+sub["arrival_cohort"] = sub["arrival_year_num"].apply(cohort)
+
+grouping_vars = {
+    "Temp. visit intention": "temp_visit",
+    "Host country":          "current_country",
+    "Arrival cohort":        "arrival_cohort",
+    "Main activity":         "main_activity",
+    "Legal status":          "legal_status",
+    "Age group":             "age",
+    "Needs care":            "needs_care",
+    "Gender":                "gender",
+}
+
+MIN_SUBGROUP_SIZE = 20    # ignore tiny subgroups where F1 is noisy
+
+rows = []
+for label, col in grouping_vars.items():
+    sizes = sub[col].value_counts()
+    valid = sizes[sizes >= MIN_SUBGROUP_SIZE].index
+
+    f1s = {}
+    for g in valid:
+        m = sub[col] == g
+        f1s[g] = f1_score(sub.loc[m, "y_true"],
+                          sub.loc[m, "y_pred"],
+                          average="macro",
+                          zero_division=0)
+    if not f1s:
+        continue
+
+    s = pd.Series(f1s)
+    rows.append({
+        "Variable": label,
+        "Best F1":  s.max(),
+        "Worst F1": s.min(),
+        "Gap":      s.max() - s.min(),
+    })
+
+table3 = (pd.DataFrame(rows)
+            .sort_values("Gap", ascending=False)
+            .reset_index(drop=True))
+
+print("\n=== Table 3 (Subgroup macro-F1 gaps) ===")
+print(table3.round(3).to_string(index=False))
+
+country_f1 = (
+    sub.groupby("current_country")
+       .apply(lambda g: f1_score(g["y_true"], g["y_pred"],
+                                 average="macro", zero_division=0))
+       .sort_values(ascending=False)
+)
+print("\n=== Per-country macro-F1 (cross-check with Figure 5) ===")
+print(country_f1.round(3).to_string())
+print(f"Country gap: {country_f1.max() - country_f1.min():.3f}")
+
+# =============================================================================
+# SECTION 16 — FIGURES
 # =============================================================================
 plt.rcParams.update({
     "font.family": "DejaVu Sans",
